@@ -1,0 +1,159 @@
+# Modular RAG MCP Server - Configuration
+# This is the main configuration file for the MCP Server.
+# Edit this file to configure LLM, Embedding, VectorStore, and other services.
+
+# =============================================================================
+# LLM Configuration
+# =============================================================================
+llm:
+  # provider: "openai"  # Options: openai, azure, ollama, deepseek
+  # model: "qwen3.6-plus"
+  # # deployment_name: "gpt-4o"
+  # # azure_endpoint: "https://YOUR_ENDPOINT.openai.azure.com/"
+  # # api_version: "2024-02-15-preview"
+  # api_key: "YOUR_DASHSCOPE_API_KEY"
+  # temperature: 0.0
+  # max_tokens: 4096
+
+  # provider: "custom"  # Options: openai, azure, ollama, deepseek, custom
+  # model: "claude-opus-4-6"
+  # base_url: "YOUR_LLM_BASE_URL"
+  # api_key: "YOUR_IFLYTEK_API_KEY"
+  # temperature: 0.0
+  # max_tokens: 16384
+
+  provider: "openai"
+  model: "deepseek-v4-pro"
+  base_url: "YOUR_LLM_BASE_URL"
+  api_key: "YOUR_DEEPSEEK_API_KEY"
+  temperature: 0.0
+  max_tokens: 16384
+
+# =============================================================================
+# Embedding Configuration
+# =============================================================================
+embedding:
+  provider: "openai"  # Options: openai, azure, ollama
+  #model: "text-embedding-ada-002"
+  model: "text-embedding-v4"
+  dimensions: 1536
+  # dimensions: 1536  # text-embedding-ada-002 固定维度 (不传递给API, 仅用于验证)
+  # Azure-compatible settings (azure_endpoint triggers Azure compat mode):
+  # azure_endpoint: "https://YOUR_ENDPOINT.openai.azure.com/"
+  # deployment_name: "text-embedding-ada-002"
+  # api_version: "2024-02-15-preview"
+  api_key: "YOUR_DASHSCOPE_API_KEY"
+  # OpenAI-specific settings (if provider is openai):
+  # api_key: "YOUR_API_KEY_HERE"
+
+# =============================================================================
+# Vision LLM Configuration (for Image Captioning)
+# =============================================================================
+vision_llm:
+  enabled: true  # Set to true to enable vision capabilities
+  provider: "openai"  # Options: openai, azure, ollama
+  model: "qwen3.6-plus"  # Options: gpt-4o, gpt-4-vision-preview (OpenAI), llava (Ollama)
+  # Azure-compatible settings (azure_endpoint triggers Azure compat mode):
+  # azure_endpoint: "https://YOUR_ENDPOINT.openai.azure.com/"
+  # deployment_name: "gpt-4o"
+  # api_version: "2024-02-15-preview"
+  api_key: "YOUR_DASHSCOPE_API_KEY"
+  # Ollama-specific settings (if provider is ollama):
+  # base_url: "http://localhost:11434"
+  max_image_size: 2048  # Max dimension (width/height) for image compression
+
+# =============================================================================
+# Vector Store Configuration
+# =============================================================================
+vector_store:
+  provider: "chroma"  # Options: chroma, qdrant, pinecone
+  persist_directory: "./data/db/chroma"
+  collection_name: "paper"
+
+# =============================================================================
+# Retrieval Configuration
+# =============================================================================
+retrieval:
+  dense_top_k: 20
+  sparse_top_k: 20
+  fusion_top_k: 10
+  rrf_k: 60  # RRF constant
+
+# =============================================================================
+# Rerank Configuration
+# =============================================================================
+rerank:
+  enabled: True # false
+  provider: "llm"  # Options: none, cross_encoder, llm
+  model: "claude-opus-4.6"
+  top_k: 5
+
+# =============================================================================
+# Evaluation Configuration
+# =============================================================================
+#evaluation:
+#  enabled: true # false
+#  provider: "ragas"  # Options: ragas, deepeval, custom
+#  metrics:
+#    - "hit_rate"
+#    - "mrr"
+#    - "faithfulness"
+
+evaluation:
+  enabled: true
+  provider: "custom"
+  metrics:
+    - "hit_rate"
+    - "mrr"
+    - "hit@1"
+    - "hit@5"
+    - "recall@5"
+    - "recall@10"
+
+
+#  provider: "ragas"
+#  metrics:
+#    - "faithfulness"
+#    - "answer_relevancy"
+#    - "context_precision"
+
+# =============================================================================
+# Observability Configuration
+# =============================================================================
+observability:
+  log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  trace_enabled: true
+  trace_file: "./logs/traces.jsonl"
+  structured_logging: true
+
+# =============================================================================
+# query_expansion
+# =============================================================================
+query_expansion:
+  enable_mqe: true
+  enable_hyde: true
+  max_expanded_queries: 3
+
+# =============================================================================
+# Ingestion Configuration
+# =============================================================================
+ingestion:
+  chunk_size: 1500
+  chunk_overlap: 200
+  splitter: "recursive"  # Options: recursive, semantic, fixed_length
+  batch_size: 10
+
+  include_references: False  # True
+  include_appendix: False  # True
+  
+  # Chunk Refiner Configuration (C5)
+  chunk_refiner:
+    use_llm: false # true  # Set to true to enable LLM-based refinement (requires LLM config)
+    # When use_llm is false or LLM call fails, falls back to rule-based refinement
+  
+  # Metadata Enricher Configuration (C6)
+  metadata_enricher:
+    use_llm: true  # Set to true to enable LLM-based enrichment (requires LLM config)
+    # When use_llm is false or LLM call fails, falls back to rule-based enrichment
+
+

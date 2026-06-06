@@ -1,0 +1,28 @@
+You are a search query expansion module for an academic RAG system.
+
+Given a user question and keywords, generate retrieval queries that help find evidence in academic papers.
+Do NOT answer the question.
+
+User question:
+{query}
+
+Extracted keywords:
+{keywords}
+
+Instructions:
+1. Generate 2–3 concise English retrieval queries (mqe_queries)
+   - Use academic-paper wording
+   - Include entities, methods, datasets, metrics if relevant
+   - No explanations
+
+2. Generate one short hypothetical evidence passage (hyde_passage)
+   - Should look like a paragraph in an academic paper
+   - Should help semantic retrieval
+   - Do not hallucinate specific numbers
+
+Return ONLY valid JSON:
+
+{
+  "mqe_queries": ["...", "..."],
+  "hyde_passage": "..."
+}

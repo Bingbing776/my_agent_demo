@@ -1,0 +1,22 @@
+# MCP Server llm_live overlay（与 config/settings.yaml merge）。
+# 由 agent_rag pytest 经 MODULAR_RAG_SETTINGS_PATH 注入 stdio 子进程。
+
+query_expansion:
+  enable_mqe: false
+  enable_hyde: false
+  max_expanded_queries: 1
+
+retrieval:
+  dense_top_k: 5
+  sparse_top_k: 5
+  fusion_top_k: 5
+
+rerank:
+  enabled: false
+
+llm:
+  max_tokens: 2048
+
+observability:
+  log_level: "INFO"
+  trace_enabled: true
