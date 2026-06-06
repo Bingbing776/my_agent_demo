@@ -1,0 +1,314 @@
+# Harness 三 Agent：Planner / Generator / Evaluator
+# LLM 仅在本文件 llm 段配置，与 agent_rag/config/settings.yaml 无关
+
+# 入口：python main.py
+
+tech_doc_path: "docs/tech_doc.md"
+
+product_root: "../agent_rag"
+
+# ---------- 测试门禁（方案 B）：在实现队列中插入 gate.* 验收任务 ----------
+milestones:
+  enabled: true
+  gates:
+    - id: gate.1
+      insert: start
+      test_file: test/contracts
+      pytest_scope: directory
+      target_class: ContractGate
+      target_symbol: all
+      skip_write_tests: true
+      title: 门禁 — 契约测试 (阶段 1)
+      description: >
+        运行 test/contracts 下全部契约测试。测试已完备，禁止修改。
+        仅验证 pytest test/contracts 是否全部通过。
+      done_criteria: pytest test/contracts 全部通过
+
+    - id: gate.2                                    # 门禁唯一标识，Controller/Planner 用来识别和引用
+      insert: after_section                          # 插入时机：某个 section 的所有任务完成后
+      section: "1"                                   # 对应 tech_doc.md 的 §1（MemoryManager 模块）
+      test_file: test/gates/test_gate_memory.py      # Evaluator 要跑的测试文件路径
+      pytest_scope: file                             # pytest 运行范围：file=单文件, directory=目录, marker=按标记
+      target_class: MemoryManager                    # 被测类名，用于 TEST_INDEX 索引匹配
+      target_symbol: gate                            # 被测符号，与 target_class 配合定位索引行
+      skip_implementation: false                     # 允许改产品；改后跑 gate + 本节 unit 测试
+      target_file: agent_rag/agent_rag/memory/memory_manager.py
+      regression_test_globs:
+        - test/unit/test_memory_*.py
+      title: 门禁 — MemoryManager 功能验收 (§1)       # Controller 日志中显示的任务名称
+      description: >
+        验收 MemoryManager 核心功能。可修改 memory_manager.py、test/gates/test_gate_memory.py、
+        test/conftest.py；修改产品后须门禁与本节 unit 测试全部通过。
+      done_criteria: pytest test/gates/test_gate_memory.py 与本节 test/unit/test_memory_*.py 全部通过
+
+    - id: gate.3
+      insert: after_section
+      section: "2"
+      test_file: test/gates/test_gate_context.py
+      pytest_scope: file
+      target_class: ContextManager
+      target_symbol: gate
+      skip_implementation: false
+      target_file: agent_rag/agent_rag/context/context_manager.py
+      regression_test_globs:
+        - test/unit/test_context_*.py
+      title: 门禁 — ContextManager 功能验收 (§2)
+      description: >
+        验收 ContextManager 核心功能。可修改 context_manager.py、test/gates/test_gate_context.py、
+        test/conftest.py；修改产品后须门禁与本节 unit 测试全部通过。
+      done_criteria: pytest test/gates/test_gate_context.py 与本节 test/unit/test_context_*.py 全部通过
+
+    - id: gate.4
+      insert: after_section
+      section: "3"
+      test_file: test/gates/test_gate_mcp.py
+      pytest_scope: file
+      target_class: McpClient
+      target_symbol: gate
+      skip_implementation: false
+      target_file: agent_rag/agent_rag/mcp/mcp_client.py
+      regression_test_globs:
+        - test/unit/test_mcp_*.py
+        - test/unit/test_executor_*.py
+      title: 门禁 — MCP 子系统功能验收 (§3)
+      description: >
+        验收 McpClient / Executor 链路。可修改 mcp 产品代码、门禁测试、conftest；
+        修改后须门禁与本节 mcp/executor unit 测试全部通过。
+      done_criteria: pytest test/gates/test_gate_mcp.py 与本节 mcp/executor unit 测试全部通过
+
+    - id: gate.5
+      insert: after_section
+      section: "4"
+      test_file: test/gates/test_gate_planner.py
+      pytest_scope: file
+      target_class: PlannerAgent
+      target_symbol: gate
+      skip_implementation: false
+      target_file: agent_rag/agent_rag/agents/planner.py
+      regression_test_globs:
+        - test/unit/test_planner_*.py
+      title: 门禁 — PlannerAgent 功能验收 (§4)
+      description: >
+        验收 PlannerAgent。可修改 planner.py、门禁测试、conftest；改产品后须门禁与本节 unit 全过。
+      done_criteria: pytest test/gates/test_gate_planner.py 与本节 test/unit/test_planner_*.py 全部通过
+
+    - id: gate.6
+      insert: after_section
+      section: "5"
+      test_file: test/gates/test_gate_evaluator.py
+      pytest_scope: file
+      target_class: Evaluator
+      target_symbol: gate
+      skip_implementation: false
+      target_file: agent_rag/agent_rag/agents/evaluator.py
+      regression_test_globs:
+        - test/unit/test_evaluator_*.py
+      title: 门禁 — Evaluator 功能验收 (§5)
+      description: >
+        验收 Evaluator。可修改 evaluator.py、门禁测试、conftest；改产品后须门禁与本节 unit 全过。
+      done_criteria: pytest test/gates/test_gate_evaluator.py 与本节 test/unit/test_evaluator_*.py 全部通过
+
+    - id: gate.7
+      insert: after_section
+      section: "6"
+      test_file: test/unit/test_generator_run_subtask.py
+      pytest_scope: file
+      target_class: Generator
+      target_symbol: run_subtask
+      title: 门禁 — Generator.run_subtask (阶段 7.2)
+      description: 子任务主循环集成单测须通过；失败时修 Generator/Evaluator/Mock 链，而非跳过。
+
+    - id: gate.8.integration
+      insert: after_section
+      section: "7"
+      test_file: test/integration
+      pytest_scope: marker
+      pytest_marker: integration
+      target_class: RagOrchestrator
+      target_symbol: scenario_regression
+      title: 门禁 — Integration 场景 (阶段 8–9)
+      description: >
+        运行 test/integration 下 integration 标记用例。
+        测试必须通过产品代码的 McpClient/Executor 调用真实 MCP server（禁止使用 mock_llm/mock_mcp_session），
+        验证 MCP 执行子系统（§3）的调用逻辑：
+        1. LLM 调用：prompt 构造是否正确、返回格式能否被正确解析、异常返回能否被处理
+        2. MCP 调用链路：通过 Executor.execute_task → McpClient.call_tool → underlying_session → 真实 MCP server
+           验证所有 10 个 MCP 工具的调用逻辑：
+           - query_knowledge_hub: 参数构造、返回的 content/citations 解析
+           - read_chunk: chunk_id 传递、返回文本解析
+           - get_neighbor_chunks: 相邻 chunk 获取、结果处理
+           - check_evidence: 证据验证、返回格式解析
+           - search_by_metadata: 元数据查询、结果过滤
+           - list_collections: 集合列表获取
+           - list_documents: 文档列表获取
+           - get_document_summary: 文档摘要获取
+           - get_document_outline: 文档大纲获取
+           - get_document_full_text: 文档全文获取
+        3. 多模块协作：Planner 规划 → Generator 通过 Executor 调 MCP → Evaluator 评估 的链路能否跑通
+        需要环境变量 LLM_API_KEY 和运行中的 MCP server（通过 stdio 或 SSE 连接）。
+        如果环境不可用，测试应 pytest.skip 并注明原因，而不是用 mock 替代。
+      done_criteria: pytest -m integration 全部通过（skip 的用例需注明环境依赖）
+      optional: true
+
+    - id: gate.e2e
+      insert: end
+      test_file: test/e2e
+      pytest_scope: marker
+      pytest_marker: e2e
+      target_class: RagOrchestrator
+      target_symbol: answer_e2e
+      title: 门禁 — E2E answer 链路 (阶段 8.3)
+      description: >
+        运行 test/e2e 下 e2e 标记用例。
+        测试必须验证完整的端到端链路（禁止 mock）：
+        1. 用户提问 → PlannerAgent 调用真实 LLM 生成子任务计划
+        2. Generator 根据计划通过 Executor.execute_task 调用真实 MCP server 的工具（10 个工具按需使用）：
+           query_knowledge_hub、read_chunk、get_neighbor_chunks、check_evidence、search_by_metadata、
+           list_collections、list_documents、get_document_summary、get_document_outline、get_document_full_text
+        3. Generator 调用真实 LLM 基于检索结果生成部分答案
+        4. RagOrchestrator 调用真实 LLM 合成最终答案并返回带引用的结果
+        验证重点：McpClient/Executor 的调用代码是否正确、MCP server 返回值解析是否正确、
+        数据在模块间传递是否正确、整个 RAG 链路能否端到端跑通。
+        需要环境变量 LLM_API_KEY 和运行中的 MCP server（通过 stdio 或 SSE 连接）。
+        如果环境不可用，测试应 pytest.skip("requires LLM_API_KEY and MCP server")。
+      done_criteria: pytest -m e2e 全部通过（skip 的用例需注明环境依赖）
+      optional: true
+implementation_root: "../agent_rag/agent_rag"
+
+# ---------- Harness 共用 LLM（三 Agent + Evaluator HTTP）----------
+
+llm_enabled: true
+llm_required: true
+
+# 讯飞 Custom（Generator / Planner / Evaluator 非 FC 路径）
+llm:
+  provider: "custom"          # custom | openai | azure | deepseek | ollama
+  model: "claude-opus-4-6"
+  base_url: "YOUR_LLM_BASE_URL"
+  api_key: "YOUR_IFLYTEK_API_KEY"
+  temperature: 0.0
+  max_tokens: 32768
+
+# DeepSeek（限流时可切换；恢复后请注释上方 llm 段讯飞配置）
+# llm:
+#   provider: "openai"
+#   model: "deepseek-v4-pro"
+#   base_url: "YOUR_LLM_BASE_URL"
+#   api_key: "YOUR_DEEPSEEK_API_KEY"
+#   temperature: 0.0
+#   max_tokens: 32768            # Generator 输出完整代码需要较大空间（fc_llm 为 4096）
+
+# ---------- Function Calling 专用 LLM（仅 Evaluator FC 使用）----------
+fc_llm:
+  provider: "openai"
+  model: "deepseek-v4-pro"
+  base_url: "YOUR_FC_LLM_BASE_URL"
+  api_key: "YOUR_DEEPSEEK_API_KEY"
+  temperature: 0.0
+  max_tokens: 4096             # FC 每轮只输出 tool_calls/final JSON，4k 足够
+
+
+
+# ---------- Planner Agent（harness/planner/ LangGraph）----------
+
+planner:
+
+  use_langgraph: true
+  use_llm: true
+
+  enrich_descriptions: true   # plan 后 LLM 分批丰富 description / done_criteria
+  enrich_batch_size: 30       # 每批 LLM 处理条数（全部 unit 任务会按批 enrich 完）
+  enrich_task_limit: 0          # 0=不限制；>0 时最多 enrich 前 N 条 unit（仍分批）
+  # enrich_max_tasks: 30      # 已废弃：仅作 enrich_batch_size 的兼容别名
+  replan_use_llm: true
+
+  temperature: 0.0
+
+
+
+# ---------- Generator Agent（harness/generator/ LangGraph）----------
+
+mcp_server_code_path: "../mcp_rag/src/mcp_server"
+mcp_server_command: "python -m src.mcp_server.server"
+mcp_server_cwd: "../mcp_rag"
+
+module_paths:
+  MemoryManager: "../agent_rag/agent_rag/memory/memory_manager.py"
+  ContextManager: "../agent_rag/agent_rag/context/context_manager.py"
+  McpClient: "../agent_rag/agent_rag/mcp/mcp_client.py"
+  Executor: "../agent_rag/agent_rag/mcp/executor.py"
+  PlannerAgent: "../agent_rag/agent_rag/agents/planner.py"
+  Evaluator: "../agent_rag/agent_rag/agents/evaluator.py"
+  Generator: "../agent_rag/agent_rag/agents/generator.py"
+  RagOrchestrator: "../agent_rag/agent_rag/orchestrator/rag_orchestrator.py"
+
+generator:
+  use_langgraph: true
+  use_llm: true
+  max_inner_steps: 8
+  merge_into_class: true
+  merge_module_header: true   # 合并 draft 中的 import / 模块级常量，并按注解推断 typing
+  merge_helpers_from_draft: true
+  allow_partial_merge: true   # 全量 merge 语法失败时逐方法合并；仍须主 symbol 成功且通过 class guard
+  relaxed_code_extraction: true
+  inject_integration_hints: true
+  inject_encoder_hint: true   # 已弃用别名，与 inject_integration_hints 等效
+  log_draft_on_skip_chars: 500
+  tech_doc_max_chars: 120000
+  code_snapshot_max_chars: 280000
+  rag_code_max_chars: 120000
+  mcp_server_code_max_chars: 80000
+  mcp_server_max_files: 50
+  temperature: 0.0
+
+
+
+# ---------- Evaluator Agent ----------
+
+evaluator:
+
+  use_llm: true
+  use_langgraph: true            # Evaluator 主流程由 LangGraph 编排（harness/evaluator/graph.py）
+  use_function_calling: true     # Evaluator FC：read_file / list_dir / grep_in_file
+  fc_mode: auto                # native=使用 fc_llm 的原生 tools；auto=优先原生失败可回退；json=仅 JSON
+  llm_transport: custom_http     # 读 harness.yaml llm.base_url（CustomLLM 完整 endpoint）
+  fc_require_custom_http: false  # true=无 base_url 即报错；false=无 HTTP 时可直接走 JSON 回退
+  fc_fallback_json: true         # auto 模式下：原生 HTTP/tools 失败 → JSON 协议 + LLMFactory
+  fc_max_rounds: 15
+  # Evaluator 送入 LLM 的正文长度：0 或省略 = 不截断；正整数 = 上限（见 runtime._prompt_cap）
+  fc_read_file_max_chars: 0
+  test_index_catalog_max_chars: 0
+  impl_snippet_max_chars: 0
+  write_tests_spec_max_chars: 0
+  prompt_pytest_max_chars: 0
+  prompt_pytest_hint_max_chars: 0
+  prompt_trace_max_chars: 0
+  prompt_draft_max_chars: 0
+  prompt_test_note_max_chars: 0
+  prompt_sync_index_max_chars: 0
+  prompt_sync_test_code_max_chars: 0
+  pytest_capture_max_chars: 0
+  eval_max_chars: 0
+  http_timeout_sec: 120
+  write_tests: true              # 评估前由 LLM 阅读测试源码判断是否完备；不全补全、不对修正、完备跳过
+  test_index_path: test/TEST_INDEX.md   # 完整目录给 LLM；FC 模式下由 LLM read_file 读具体测试文件
+  test_index_llm_sync: true      # 改测试文件后用 LLM 同步索引；失败则规则 upsert
+  test_progress_path: test/TEST_PROGRESS.md  # LLM 终判 JSON 的 progress 字段 → 本表对应行
+  test_progress_update: true     # LangGraph 节点 update_test_progress 落盘
+  test_progress_discover_all: true  # 扫描 test/**/test_*.py，纳入 contracts/e2e 等（不仅 TEST_INDEX）
+  test_changelog_path: test/TEST_CHANGELOG.md  # Evaluator 改写测试文件时追加变更记录（含 diff）
+  test_changelog_update: true
+  test_changelog_diff_max_chars: 12000  # diff 块字符上限；0=不截断
+  write_tests_context_max_chars: 0   # 保留键兼容；Evaluator 写测试路径已用 impl_snippet / 全文索引
+
+  strict_json: true
+
+  pytest_timeout_sec: 120
+
+  quick_rule_error_streak: 3
+
+  skip_coverage_recheck_when_stable: true  # 同一子任务内循环：测试未改且上次 coverage=skip 时跳过 FC
+
+  temperature: 0.0
+
+
