@@ -1,0 +1,221 @@
+# Modular RAG MCP Server / RAG 产品运行时配置
+# 供 agent_rag/ 包 §1–§7 与 RagOrchestrator、父项目 MCP 使用 — 见 rag_agent 段
+# Harness 写代码请用 config/harness.yaml（python main.py）
+#
+# llm_live 测试专用 overlay：config/settings.llm_live.yaml
+# 运行 pytest -m llm_live 时与本文 deep-merge（更短步数/超时，MCP 侧禁用 MQE/HyDE）。
+
+# Modular RAG MCP Server - Configuration
+# This is the main configuration file for the MCP Server.
+# Edit this file to configure LLM, Embedding, VectorStore, and other services.
+
+# =============================================================================
+# LLM Configuration
+# =============================================================================
+llm:
+  provider: "openai"
+  model: "deepseek-v4-pro"
+  base_url: "YOUR_LLM_BASE_URL"
+  api_key: "YOUR_DEEPSEEK_API_KEY"
+  temperature: 0.0
+  max_tokens: 16384
+
+# =============================================================================
+# Embedding Configuration
+# =============================================================================
+embedding:
+  provider: "openai"  # Options: openai, azure, ollama
+  #model: "text-embedding-ada-002"
+  model: "text-embedding-v4"
+  dimensions: 1536
+  # dimensions: 1536  # text-embedding-ada-002 固定维度 (不传递给API, 仅用于验证)
+  # Azure-compatible settings (azure_endpoint triggers Azure compat mode):
+  # azure_endpoint: "https://YOUR_ENDPOINT.openai.azure.com/"
+  # deployment_name: "text-embedding-ada-002"
+  # api_version: "2024-02-15-preview"
+  api_key: "YOUR_DASHSCOPE_API_KEY"
+  # OpenAI-specific settings (if provider is openai):
+  # api_key: "YOUR_API_KEY_HERE"
+
+# =============================================================================
+# Vision LLM Configuration (for Image Captioning)
+# =============================================================================
+vision_llm:
+  enabled: true  # Set to true to enable vision capabilities
+  provider: "openai"  # Options: openai, azure, ollama
+  model: "qwen3.6-plus"  # Options: gpt-4o, gpt-4-vision-preview (OpenAI), llava (Ollama)
+  # Azure-compatible settings (azure_endpoint triggers Azure compat mode):
+  # azure_endpoint: "https://YOUR_ENDPOINT.openai.azure.com/"
+  # deployment_name: "gpt-4o"
+  # api_version: "2024-02-15-preview"
+  api_key: "YOUR_DASHSCOPE_API_KEY"
+  # Ollama-specific settings (if provider is ollama):
+  # base_url: "http://localhost:11434"
+  max_image_size: 2048  # Max dimension (width/height) for image compression
+
+# =============================================================================
+# Vector Store Configuration
+# =============================================================================
+vector_store:
+  provider: "chroma"  # Options: chroma, qdrant, pinecone
+  persist_directory: "./data/db/chroma"
+  collection_name: "knowledge_hub"
+
+# =============================================================================
+# Retrieval Configuration
+# =============================================================================
+retrieval:
+  dense_top_k: 20
+  sparse_top_k: 20
+  fusion_top_k: 10
+  rrf_k: 60  # RRF constant
+
+# =============================================================================
+# Rerank Configuration
+# =============================================================================
+rerank:
+  enabled: True # false
+  provider: "llm"  # Options: none, cross_encoder, llm
+  model: "qwen3.6-plus"
+  top_k: 5
+
+# =============================================================================
+# Evaluation Configuration
+# =============================================================================
+#evaluation:
+#  enabled: true # false
+#  provider: "ragas"  # Options: ragas, deepeval, custom
+#  metrics:
+#    - "hit_rate"
+#    - "mrr"
+#    - "faithfulness"
+
+evaluation:
+  enabled: true
+  provider: "custom"
+  metrics:
+    - "hit_rate"
+    - "mrr"
+    - "hit@1"
+    - "hit@5"
+    - "recall@5"
+    - "recall@10"
+
+
+#  provider: "ragas"
+#  metrics:
+#    - "faithfulness"
+#    - "answer_relevancy"
+#    - "context_precision"
+
+# =============================================================================
+# Observability Configuration
+# =============================================================================
+observability:
+  log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  trace_enabled: true
+  trace_file: "./logs/traces.jsonl"
+  structured_logging: true
+
+# =============================================================================
+# query_expansion
+# =============================================================================
+query_expansion:
+  enable_mqe: true
+  enable_hyde: true
+  max_expanded_queries: 3
+
+# =============================================================================
+# Ingestion Configuration
+# =============================================================================
+ingestion:
+  chunk_size: 1500
+  chunk_overlap: 200
+  splitter: "recursive"  # Options: recursive, semantic, fixed_length
+  batch_size: 10
+
+  include_references: False  # True
+  include_appendix: False  # True
+  
+  # Chunk Refiner Configuration (C5)
+  chunk_refiner:
+    use_llm: false # true  # Set to true to enable LLM-based refinement (requires LLM config)
+    # When use_llm is false or LLM call fails, falls back to rule-based refinement
+  
+  # Metadata Enricher Configuration (C6)
+  metadata_enricher:
+    use_llm: true  # Set to true to enable LLM-based enrichment (requires LLM config)
+    # When use_llm is false or LLM call fails, falls back to rule-based enrichment
+
+# =============================================================================
+# RAG Agent (agent_rag) — RagOrchestrator(config)
+# =============================================================================
+# 实现：`yaml.safe_load` 读本文件后，将 **`rag_agent`** 整段（或与顶层 `llm` / `embedding` 等合并后的 dict）
+# 作为 **`RagOrchestrator(config)`** 的 `config` 传入（见 `docs/tech_doc.md` §7.0）。
+# `mcp.stdio.cwd`：须指向 **mcp_rag** 子项目根目录（使 `python -m main` 可启动 MCP stdio）。
+# `routing_skill_path`：相对 **`agent_rag` 项目根**（或实现约定的 cwd）的路径。
+rag_agent:
+  routing_skill_path: "skill/mcp-tool-router.md"
+  # §4 load_routing_hint：0 / 未配置 / null 表示不裁切；>0 为抽取正文最大字符数（小 skill 建议 0）
+  routing_hint_max_chars: 0
+
+  mcp:
+    stdio:
+      command: "python"
+      args: ["-m", "src.mcp_server.server"]
+      cwd: "../mcp_rag"
+      env: {}
+    # Dashboard 等多轮场景设为 true，复用 MCP 子进程；run_test 单次调用保持 false（默认）
+    persistent_stdio: false
+
+  # §3.1 McpClient 可选参数（实现读取后传入 McpClient.__init__）
+  mcp_client:
+    call_tool_timeout_sec: 360
+
+  # §3.2 Executor（与 tech_doc.md §3.2 对齐；键名实现可微调但须整仓一致）
+  executor:
+    # MCP tools/call（Executor.call_tool）— 与 fill_arguments 的 LLM 重试分键
+    max_retries: 3  # 再试次数（不含首次 call_tool）
+    backoff_base_sec: 0.5  # call_tool 指数退避基数（秒）
+    fill_arguments_max_llm_retries: 2  # 再试次数（不含首轮 chat）；首轮+2 重试共 3 轮
+    fill_arguments_retry_backoff_sec: 0.3  # 相邻两轮 chat 之间 sleep（秒）
+
+  # §5 Evaluator
+  evaluator:
+    eval_max_chars: 120000  # 内容拼进 evaluate 的 user_prompt的字符数上线
+    strict_json: true  # evaluate 要求模型只输出 JSON，True解析 JSON 失败（截断、多段、非法键、缺关键字段等）就当作这次评估失败，False：可以更宽松，例如缺键时用默认值补全、或只做部分校验
+
+  # §6 Generator
+  generator:
+    max_inner_steps: 12
+    mcp_summary_max_chars: 80000
+    inner_trace_max_chars: 100000
+    draft_max_chars: 120000
+    temperature: 0.0
+
+  # §7 RagOrchestrator — 终稿门禁、全局 replan、终稿合成（见 tech_doc.md §7）
+  orchestrator:
+    max_global_replan_rounds: 2
+    # 子任务 needs_replan 触发 planner.replan 的上限（与 max_global_replan_rounds 不同层级）
+    max_subtask_replan_rounds: 5
+    # 单次 answer 执行子任务总数硬上限（含初始 plan + replan 追加）
+    max_subtasks_total: 20
+    global_replan_observation_max_chars: 8000
+    final_evidence_bundle_max_chars: 200000
+    final_evidence_draft_max_chars: 12000
+    final_evidence_trace_max_chars: 80000
+    # 证据仍不足且全局 replan 轮次用尽时，是否仍调用 _synthesize_final_answer（并在 prompt 注明不足）
+    allow_final_on_insufficient_evidence: true
+    # 连续检索未产生新 chunk_id/doc_id 时停止 replan/继续检索
+    skip_replan_when_no_new_evidence: true
+    no_new_evidence_replan_streak: 1
+    # global_readiness_system_prompt / final_synthesis_system_prompt：实现可放代码常量或在此扩展
+
+  # §7 终稿多模态（_should_attach_images / _merge_subtask_images）
+  attach_images_when_present: true
+  answer_max_images: 10
+
+  # §1 / §2：若实现从 YAML 读 MemoryManager / ContextManager 的标量开关，可放在此二子树下；否则可留空由代码默认
+  memory: {}
+  context: {}
+

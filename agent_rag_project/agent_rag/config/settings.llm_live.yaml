@@ -1,0 +1,40 @@
+# llm_live / 本地快测 overlay：pytest -m llm_live、run_test.py、dashboard 默认加载。
+# 完整慢速 E2E：AGENT_RAG_FULL=1 python run_test.py
+#
+# MCP 子进程通过 rag_agent.mcp.stdio.env.MODULAR_RAG_SETTINGS_PATH 加载
+# mcp_rag/config/settings.llm_live.yaml（见该仓 overlay）。
+
+llm:
+  max_tokens: 2048
+
+rag_agent:
+  generator:
+    max_inner_steps: 3
+    cold_start_use_suggested_tool: true
+    mcp_summary_max_chars: 0  # 不截断，保留完整的 MCP 返回（含 chunk_ids）
+    inner_trace_max_chars: 0  # 不截断
+    draft_max_chars: 2000
+  orchestrator:
+    max_global_replan_rounds: 0
+    max_subtask_replan_rounds: 2
+    max_subtasks_total: 15
+    allow_final_on_insufficient_evidence: true
+    skip_replan_when_no_new_evidence: true
+    no_new_evidence_replan_streak: 1
+    final_evidence_bundle_max_chars: 20000
+    final_evidence_draft_max_chars: 3000
+    final_evidence_trace_max_chars: 4000
+  mcp_client:
+    call_tool_timeout_sec: 90
+  executor:
+    max_retries: 1
+    fill_arguments_max_llm_retries: 1
+    fill_arguments_retry_backoff_sec: 0.1
+  evaluator:
+    eval_max_chars: 8000
+  planner:
+    replan_observation_max_chars: 2000
+  mcp:
+    stdio:
+      env:
+        MODULAR_RAG_SETTINGS_PATH: "config/settings.llm_live.yaml"
